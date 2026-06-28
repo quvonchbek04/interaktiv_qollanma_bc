@@ -1,5 +1,8 @@
-// db.js — Ma'lumotlar bazasiga ulanish (better-sqlite3)
-const Database = require('better-sqlite3');
+// db.js — Ma'lumotlar bazasiga ulanish (node:sqlite — Node.js v22 built-in)
+// ESLATMA: better-sqlite3/sqlite3 ATAYLAB ishlatilmaydi (tarmoq cheklovi tufayli
+// ba'zi hosting muhitlarida native module build bo'lmaydi). O'rniga Node.js
+// ichki node:sqlite (DatabaseSync) ishlatiladi — bu hech qanday kompilyatsiya talab qilmaydi.
+const { DatabaseSync } = require('node:sqlite');
 const path = require('path');
 const fs = require('fs');
 const bcrypt = require('bcryptjs');
@@ -7,10 +10,10 @@ const bcrypt = require('bcryptjs');
 const DB_PATH = path.join(__dirname, 'platform.db');
 const SCHEMA_PATH = path.join(__dirname, 'schema.sql');
 
-const db = new Database(DB_PATH);
+const db = new DatabaseSync(DB_PATH);
 
 // WAL rejimi — yozish tezligi uchun
-db.pragma('journal_mode = WAL');
+db.exec('PRAGMA journal_mode = WAL;');
 
 // Schema yaratish
 const schema = fs.readFileSync(SCHEMA_PATH, 'utf-8');
@@ -46,13 +49,30 @@ indexStatements.forEach((stmt) => db.exec(stmt + ';'));
 
 console.log("Ma'lumotlar bazasi tayyor:", DB_PATH);
 
-// ===== BIRINCHI FOYDALANUVCHI — ADMIN =====
-// Agar bazada hech kim yo'q bo'lsa, birinchi ro'yxatdan o'tuvchi avtomatik admin bo'ladi.
-// Bu mantiq /api/auth/register endpointida ishlaydi.
-(function checkFirstUser() {
-  const count = db.prepare('SELECT COUNT(*) as cnt FROM users').get();
-  if (count.cnt === 0) {
-    console.log("INFO: Bazada foydalanuvchi yo'q. Birinchi ro'yxatdan o'tuvchi avtomatik ADMIN bo'ladi.");
+// ===== SEED: ADMIN AKAUNT =====
+(function seedAdminUser() {
+  const ADMIN_EMAIL    = process.env.ADMIN_EMAIL    || 'qochqorovquvonchbek737@gmail.com';
+  const ADMIN_NAME     = process.env.ADMIN_NAME     || 'Admin';
+  const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
+
+  const existing = db.prepare('SELECT id, password_hash FROM users WHERE email = ?').get(ADMIN_EMAIL);
+
+  if (!existing) {
+    const hash = bcrypt.hashSync(ADMIN_PASSWORD, 10);
+    db.prepare(
+      'INSERT INTO users (full_name, email, password_hash, is_admin) VALUES (?, ?, ?, 1)'
+    ).run(ADMIN_NAME, ADMIN_EMAIL, hash);
+    console.log('✅ Admin akaunt yaratildi:', ADMIN_EMAIL, '| Parol:', ADMIN_PASSWORD);
+  } else {
+    // is_admin ni doim 1 ga o'rnatish
+    db.prepare('UPDATE users SET is_admin = 1 WHERE email = ?').run(ADMIN_EMAIL);
+
+    // Agar parol hali hash qilinmagan (eski tizim) bo'lsa — yangilaymiz
+    if (existing.password_hash === 'no-password') {
+      const hash = bcrypt.hashSync(ADMIN_PASSWORD, 10);
+      db.prepare('UPDATE users SET password_hash = ? WHERE email = ?').run(hash, ADMIN_EMAIL);
+      console.log('✅ Admin paroli yangilandi. Parol:', ADMIN_PASSWORD);
+    }
   }
 })();
 
