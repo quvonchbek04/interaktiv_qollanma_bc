@@ -13,8 +13,9 @@ const requireAdmin = require('../middleware/adminAuth');
 
 const router = express.Router();
 
-// Fon rasmlari uchun papka
-const bgDir = path.join(__dirname, '..', 'uploads', 'backgrounds');
+// Fon rasmlari uchun papka (UPLOAD_DIR env orqali belgilanishi mumkin)
+const UPLOAD_ROOT = process.env.UPLOAD_DIR || path.join(__dirname, '..', 'uploads');
+const bgDir = path.join(UPLOAD_ROOT, 'backgrounds');
 if (!fs.existsSync(bgDir)) fs.mkdirSync(bgDir, { recursive: true });
 
 const storage = multer.diskStorage({

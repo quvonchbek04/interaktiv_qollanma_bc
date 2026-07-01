@@ -20,9 +20,23 @@ require('./database/db');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-app.use(cors());
+// UPLOAD_DIR env orqali belgilanishi mumkin (masalan, Render Persistent Disk uchun)
+const UPLOAD_ROOT = process.env.UPLOAD_DIR || path.join(__dirname, 'uploads');
+
+// CORS: FRONTEND_URL env orqali ruxsat etilgan domen(lar)ni belgilash mumkin
+// (bir nechta domen bo'lsa vergul bilan ajratib yozing). Bo'sh bo'lsa — hammaga ochiq.
+const allowedOrigins = (process.env.FRONTEND_URL || '')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean);
+
+app.use(cors(
+  allowedOrigins.length
+    ? { origin: allowedOrigins }
+    : {}
+));
 app.use(express.json());
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/uploads', express.static(UPLOAD_ROOT));
 
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/users', require('./routes/users'));

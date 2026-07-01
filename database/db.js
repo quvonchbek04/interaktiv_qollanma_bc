@@ -7,8 +7,13 @@ const path = require('path');
 const fs = require('fs');
 const bcrypt = require('bcryptjs');
 
-const DB_PATH = path.join(__dirname, 'platform.db');
+// DB_PATH env orqali belgilanishi mumkin (masalan, Render Persistent Disk uchun)
+const DB_PATH = process.env.DB_PATH || path.join(__dirname, 'platform.db');
 const SCHEMA_PATH = path.join(__dirname, 'schema.sql');
+
+// Agar DB_PATH boshqa papkada bo'lsa (masalan, mount qilingan disk), papkani yaratib qo'yamiz
+const dbDir = path.dirname(DB_PATH);
+if (!fs.existsSync(dbDir)) fs.mkdirSync(dbDir, { recursive: true });
 
 const db = new DatabaseSync(DB_PATH);
 

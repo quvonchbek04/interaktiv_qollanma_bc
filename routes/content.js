@@ -12,10 +12,13 @@ const requireAdmin = require('../middleware/adminAuth');
 
 const router = express.Router();
 
+// UPLOAD_DIR env orqali belgilanishi mumkin (masalan, Render Persistent Disk uchun)
+const UPLOAD_ROOT = process.env.UPLOAD_DIR || path.join(__dirname, '..', 'uploads');
+
 // ===== MULTER SOZLAMASI =====
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const tmpDir = path.join(__dirname, '..', 'uploads', 'tmp');
+    const tmpDir = path.join(UPLOAD_ROOT, 'tmp');
     if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
     cb(null, tmpDir);
   },
@@ -68,7 +71,7 @@ router.post('/upload', requireAuth, requireAdmin, upload.single('file'), (req, r
     }
 
     const folderMap = { book: 'books', video: 'videos', audio: 'audio' };
-    const targetDir = path.join(__dirname, '..', 'uploads', folderMap[type]);
+    const targetDir = path.join(UPLOAD_ROOT, folderMap[type]);
     if (!fs.existsSync(targetDir)) fs.mkdirSync(targetDir, { recursive: true });
     const targetPath = path.join(targetDir, req.file.filename);
     fs.renameSync(req.file.path, targetPath);
@@ -96,7 +99,8 @@ router.delete('/:id', requireAuth, requireAdmin, (req, res) => {
   if (!item) return res.status(404).json({ error: 'Kontent topilmadi.' });
 
   if (item.content_source === 'upload' && item.file_path) {
-    const fullPath = path.join(__dirname, '..', item.file_path);
+    const relative = item.file_path.replace(/^\/uploads\//, '');
+    const fullPath = path.join(UPLOAD_ROOT, relative);
     fs.unlink(fullPath, (err) => { if (err) console.error('Fayl o\'chirishda xato:', err.message); });
   }
 
