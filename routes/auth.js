@@ -54,6 +54,49 @@ router.post('/login', async (req, res) => {
   }
 });
 
+// ===== RO'YXATDAN O'TISH — ochiq, hamma uchun =====
+// POST /api/auth/register
+// Body: { full_name, password }
+router.post('/register', async (req, res) => {
+  try {
+    const { full_name, password } = req.body;
+
+    if (!full_name || !full_name.trim()) {
+      return res.status(400).json({ error: 'Ism kiritilishi shart.' });
+    }
+    if (!password || password.length < 6) {
+      return res.status(400).json({ error: 'Parol kamida 6 ta belgidan iborat bo\'lishi kerak.' });
+    }
+
+    const name = full_name.trim();
+    const existing = db.prepare('SELECT id FROM users WHERE full_name = ?').get(name);
+    if (existing) {
+      return res.status(409).json({ error: 'Bu ism allaqachon band.' });
+    }
+
+    const password_hash = await bcrypt.hash(password, 10);
+    const email = `user_${Date.now()}@platform.local`;
+
+    const result = db.prepare(
+      'INSERT INTO users (full_name, email, password_hash, is_admin) VALUES (?, ?, ?, 0)'
+    ).run(name, email, password_hash);
+
+    const user = {
+      id: result.lastInsertRowid,
+      full_name: name,
+      email,
+      is_admin: 0
+    };
+
+    const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: '30d' });
+
+    res.status(201).json({ token, user });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server xatosi.' });
+  }
+});
+
 // ===== FOYDALANUVCHI QO'SHISH — faqat admin =====
 // POST /api/auth/add-user
 // Body: { full_name, password }
